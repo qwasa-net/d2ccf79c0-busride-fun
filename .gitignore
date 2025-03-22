@@ -1,0 +1,14 @@
+cache__/
+*.py[cod]
+
+[_.]venv/
+[_.]env/
+
+*.log
+*.sqlite3
+*.bak
+
+.vscode/
+.settings/
+
+_kakas/
