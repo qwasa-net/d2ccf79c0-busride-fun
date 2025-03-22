@@ -1,0 +1,6 @@
+[project]
+name = "buspub-service"
+version = "0.1.0"
+description = "A service for buspub"
+readme = "README.md"
+requires-python = ">=3.11"
