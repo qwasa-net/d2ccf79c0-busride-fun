@@ -8,10 +8,11 @@ def configure_logging(config: Namespace) -> None:
     """
     Configures the logging settings for the application.
     """
+    llevel = logging.DEBUG if config.debug else logging.INFO
     logging.basicConfig(
-        level=logging.INFO,
+        level=llevel,
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[logging.StreamHandler()],
     )
-    log.setLevel(logging.INFO)
+    log.setLevel(llevel)

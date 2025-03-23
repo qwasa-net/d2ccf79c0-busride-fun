@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import socket
+import time
 
 from . import service
 from .logger import configure_logging, log
@@ -37,12 +38,12 @@ def read_args() -> argparse.Namespace:
     parser.add_argument(
         "--kick-count",
         type=int,
-        default=int(os.environ.get("KICK_COUNT", "100")),
+        default=int(os.environ.get("KICK_COUNT", "0")),
     )
     parser.add_argument(
         "--catch-count",
         type=int,
-        default=int(os.environ.get("CATCH_COUNT", "100")),
+        default=int(os.environ.get("CATCH_COUNT", "0")),
     )
     parser.add_argument(
         "--exit",
@@ -50,10 +51,15 @@ def read_args() -> argparse.Namespace:
         default=bool(os.environ.get("EXIT", "")),
     )
     parser.add_argument(
+        "--start-delay",
+        type=int,
+        default=int(os.environ.get("START_DELAY", "0")),
+    )
+    parser.add_argument(
         "--bus-type",
         type=str,
         default=os.environ.get("BUS_TYPE", "redis"),
-        choices=["redis", "dummy"],
+        choices=["redis", "kafka", "dummy"],
     )
     parser.add_argument(
         "--bus-connection",
@@ -62,6 +68,11 @@ def read_args() -> argparse.Namespace:
             "BUS_CONNECTION",
             '{"host": "localhost", "port": 6379, "db": 0}',
         ),
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=bool(os.environ.get("DEBUG", "")),
     )
     args, _ = parser.parse_known_args()
 
@@ -87,6 +98,7 @@ def main() -> None:
     configure_logging(config)
     log.info("Starting service with args: %s", config)
     srv = service.ServiceFactory.create(config)
+    time.sleep(config.start_delay)
     srv.run()
 
 

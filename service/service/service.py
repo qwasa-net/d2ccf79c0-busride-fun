@@ -1,9 +1,9 @@
 import random
-import sys
+import time
 from argparse import Namespace
 
-from .bus import BusDriver, BusMessage, dummy, get_bus_driver, redis  # noqa
-from .helpers import sleeq
+from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, redis  # noqa
+from .helpers import rndstr, sleeq
 from .logger import log
 
 
@@ -43,25 +43,23 @@ class Service:
 
     def process(self, messages: list[BusMessage]) -> list[BusMessage]:
         output = []
-        for msg in messages:
+        for msg in messages or []:
             datas = msg.datas()
+            log.debug("processing: id=%s log=%.80s", datas["id"], datas["log"])
 
-            log.debug(
-                "processing: id=%s log=%s",
-                datas["id"],
-                datas["log"][-40:],
-            )
+            # hard work simulation
             sleeq(self.config.work_hard_time)
-
             datas["log"] = str(datas.get("log") or "") + ";" + str(self.id)
-            datas["value"] = float(datas["value"]) + random.random()
+            datas["counter"] = int(datas.get("counter", 0)) + 1
+            datas["payload"] = rndstr(256)
 
             out_msg = BusMessage(
                 data=datas,
                 rcpt=self.choose_rcpt(msg),
                 sender=self.id,
             )
-            log.debug("sending [%s] to: %s", datas["id"], out_msg.rcpt)
+
+            log.debug("next hop: #%s [%s]->[%s]", datas["id"], self.id, out_msg.rcpt)
             if out_msg.rcpt is not None:
                 output.append(out_msg)
 
@@ -91,44 +89,57 @@ class ServiceKicker(Service):
         log.info("kicker exiting")
 
     def kick(self) -> None:
-        for i in range(int(self.kick_count)):
+        messages = []
+        for i in range(1, int(self.kick_count) + 1):
             sleeq(self.work_hard_time)
             message = BusMessage(
-                data={"log": str(self.id), "id": str(i), "value": 0},
+                data={
+                    "id": str(i),
+                    "ts": int(time.time()),
+                    "counter": 1,
+                    "log": str(self.id),
+                    "payload": rndstr(256),
+                },
                 rcpt=self.choose_rcpt(None),
                 sender=self.id,
             )
-            log.info("kicking the bus: #[%s], [%s]→[%s]", i, self.id, message.rcpt)
-            self.driver.send([message])
+            log.info("kicking the bus: #%s ·→[%s]", i, message.rcpt)
+            messages.append(message)
+        self.driver.send(messages)
 
 
 class ServiceCatcher(Service):
 
     def __init__(self, config: Namespace) -> None:
-        self.counter = 0
+        self.catched = set()
         self.catch_count = config.catch_count
         super().__init__(config)
 
-    def work(self) -> None:
-        super().work()
-        if self.catch_count is not None and self.counter >= self.catch_count:
-            log.info("catcher finished, counter=%s", self.counter)
-            if self.config.exit:
-                log.info("catcher exiting")
-                sys.exit(0)
+    def run(self) -> None:
+        while self.catch_count is None or len(self.catched) < self.catch_count:
+            self.work()
+
+        log.info("catcher finished, counter=%s", len(self.catched))
+
+        while not self.config.exit:
+            self.idle(999)
+
+        log.info("catcher exiting")
 
     def process(self, messages: list[BusMessage]) -> list[BusMessage]:
         for message in messages:
             datas = message.datas()
-            self.counter += 1
-            logg = datas.get("log", "").split(";")
+            self.catched.add(datas["id"])
+            logs = datas.get("log", "").split(";")
+            ride_time = int(time.time()) - int(datas.get("ts", 0))
             log.info(
-                "catched: |%s| id=%s value=%.2f log=|%s/%s|=%.80s",
-                self.counter,
+                "catched (%s): #%s payload=%.10s tt=%s log=|%s/%s|=%.80s",
+                len(self.catched),
                 datas["id"],
-                float(datas["value"]),
-                len(logg),
-                len(set(logg)),
+                datas["payload"],
+                f"{ride_time // 60}:{ride_time % 60:02d}",
+                len(logs),
+                len(set(logs)),
                 datas["log"],
             )
         return []

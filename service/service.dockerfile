@@ -10,6 +10,7 @@ RUN --mount=type=cache,mode=0755,id=pip-cache,target=/var/pip-cache PIP_CACHE_DI
 COPY ./service /service/service
 
 ENV PYTHONPATH=/service/service
+ENV PYTHONUNBUFFERED=1
 
 USER nobody
 

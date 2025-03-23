@@ -6,15 +6,15 @@ VENV_PATH ?= $(HOME_PATH)/_venv
 PYTHON ?= PYTHONPATH=$(HOME_PATH) $(VENV_PATH)/bin/python
 SYSTEM_PYTHON ?= python3
 
-DOCKER ?= DOCKER_BUILDKIT=1 DOCKER_PROGRESS=plain docker
+DOCKER ?= DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker
 DOCKER_IMAGE ?= busride-service
 
 SRCFILES := service
 
 venv: ##
 	test -d $(VENV_PATH) || $(SYSTEM_PYTHON) -m venv $(VENV_PATH) --clear
-	$(PYTHON) -m pip install --upgrade --requirement requirements.txt
-	$(PYTHON) -m pip install --upgrade --requirement requirements-dev.txt
+	$(PYTHON) -m pip install --requirement requirements.txt
+	$(PYTHON) -m pip install --requirement requirements-dev.txt
 
 format:  ##
 	$(PYTHON) -m black $(SRCFILES)
