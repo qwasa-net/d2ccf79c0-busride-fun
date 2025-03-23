@@ -1,5 +1,10 @@
 # bus ride fun
 
+## what is this wonderful thing?
+
+![Components](misc/components.png)
+
+
 ## how to have a joy ride
 
 ```
@@ -65,7 +70,7 @@ catcher stats:
   most common legs: 9→8×122; 7→1×122; 4→X×120; 9→2×120; 3→7×120; 10→9×119; 0→7×119; 3→9×119; 1→3×11
 ```
 
-## sample ride map (redis, 987 messages, 9 stops + kicker + catcher)
+## sample ride map (redis, 1987 messages, 19 stops + kicker + catcher)
 
 
 ![Bus Ride Fun](misc/map.png)

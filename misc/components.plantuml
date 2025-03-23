@@ -1,0 +1,55 @@
+@startuml
+!theme mars
+scale 4096 width
+skinparam linetype polyline
+skinparam nodesep 5
+skinparam ranksep 100
+
+rectangle "BUS" {
+    queue "redis | kafka | …" as bus
+}
+
+node "kicker" as s0
+
+node "catcher" as sX
+
+rectangle "workers" {
+    node "s1" as s1
+    node "s2" as s2
+    node "s3" as s3
+    node "s4" as s4
+    node "s5" as s5
+    node "s6" as s6
+    node "s7" as s7
+    node "s8" as s8
+    node "s9" as s9
+    node "sN" as sn
+}
+
+s0 ---right--> bus
+bus ---right--> sX
+
+s1 ..> bus
+s2 ..> bus
+s3 ..> bus
+s4 ..> bus
+s5 ..> bus
+s6 ..> bus
+s7 ..> bus
+s8 ..> bus
+s9 ..> bus
+sn ..> bus
+
+bus ..> s1
+bus ..> s2
+bus ..> s3
+bus ..> s4
+bus ..> s5
+bus ..> s6
+bus ..> s7
+bus ..> s8
+bus ..> s9
+bus ..> sn
+
+
+@enduml
