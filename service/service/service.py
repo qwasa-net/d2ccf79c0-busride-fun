@@ -1,6 +1,7 @@
 import random
 import time
 from argparse import Namespace
+from collections import Counter
 
 from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, redis  # noqa
 from .helpers import rndstr, sleeq
@@ -111,15 +112,22 @@ class ServiceKicker(Service):
 class ServiceCatcher(Service):
 
     def __init__(self, config: Namespace) -> None:
-        self.catched = set()
+        self.caught_ids = set()
+        self.caught_stops = Counter()
+        self.caught_legs = Counter()
+        self.travel_times = []
         self.catch_count = config.catch_count
         super().__init__(config)
 
     def run(self) -> None:
-        while self.catch_count is None or len(self.catched) < self.catch_count:
+        while self.catch_count is None or len(self.caught_ids) < self.catch_count:
             self.work()
 
-        log.info("catcher finished, counter=%s", len(self.catched))
+        log.info("catcher finished, counter=%s", len(self.caught_ids))
+        self.show_stats()
+
+        if self.config.draw_stats:
+            self.draw_stats()
 
         while not self.config.exit:
             self.idle(999)
@@ -128,21 +136,95 @@ class ServiceCatcher(Service):
 
     def process(self, messages: list[BusMessage]) -> list[BusMessage]:
         for message in messages:
-            datas = message.datas()
-            self.catched.add(datas["id"])
-            logs = datas.get("log", "").split(";")
-            ride_time = int(time.time()) - int(datas.get("ts", 0))
-            log.info(
-                "catched (%s): #%s payload=%.10s tt=%s log=|%s/%s|=%.80s",
-                len(self.catched),
-                datas["id"],
-                datas["payload"],
-                f"{ride_time // 60}:{ride_time % 60:02d}",
-                len(logs),
-                len(set(logs)),
-                datas["log"],
-            )
+            message_data = message.datas()
+            self.process_message(message_data)
         return []
+
+    def process_message(self, msg: dict) -> None:
+
+        # keep message ids
+        if msg["id"] in self.caught_ids:
+            log.warning("already catched: #%s", msg["id"])
+        self.caught_ids.add(msg["id"])
+
+        # count all ride stops and legs
+        logs = msg.get("log", "").split(";")
+        logs.append("X")  # we are right here, at the end
+        self.caught_stops.update(logs)
+        for i in range(len(logs) - 1):
+            leg = (logs[i], logs[i + 1])
+            self.caught_legs.update([leg])
+
+        # save travel time
+        travel_time = int(time.time()) - int(msg.get("ts", 0))
+        self.travel_times.append((travel_time, len(logs)))
+
+        # log the message
+        log.info(
+            "catched (%s): #%s payload=%.10s tt=%s log=|%s/%s|=%.80s",
+            len(self.caught_ids),
+            msg["id"],
+            msg["payload"],
+            f"{travel_time // 60}:{travel_time % 60:02d}",
+            len(logs),
+            len(set(logs)),
+            msg["log"],
+        )
+
+    def show_stats(self) -> None:
+        log.info("catcher stats:")
+        log.info("  caught messages: %s", len(self.caught_ids))
+        log.info("  stops: %s", len(self.caught_stops))
+        log.info("  legs: %s", len(self.caught_legs))
+        log.info(
+            "  min travel time/legs: %.0d/%.0d",
+            min([tt[0] for tt in self.travel_times]),
+            min([tt[1] for tt in self.travel_times]),
+        )
+        log.info(
+            "  max travel time/legs: %.0d/%.0d",
+            max([tt[0] for tt in self.travel_times]),
+            max([tt[1] for tt in self.travel_times]),
+        )
+        log.info(
+            "  avg travel time/legs: %.2f/%.2f",
+            sum([tt[0] for tt in self.travel_times]) / len(self.travel_times),
+            sum([tt[1] for tt in self.travel_times]) / len(self.travel_times),
+        )
+        log.info(
+            "  most common stops: %s",
+            "; ".join([f"{k}×{v}" for k, v in self.caught_stops.most_common(10)]),
+        )
+        log.info(
+            "  most common legs: %s",
+            "; ".join([f"{k[0]}→{k[1]}×{v}" for k, v in self.caught_legs.most_common(10)]),
+        )
+
+    def draw_stats(self) -> None:
+        plantuml = [""]
+        plantuml.append("@startuml")
+        plantuml.append("scale 4096 width")
+        plantuml.append(
+            f"""title Fun Ride: {self.config.bus_type} bus, """
+            f"""{len(self.caught_ids)} passengers, """
+            f"""{len(self.caught_stops)} stops"""
+        )
+        stop_styles = {"0": "<<choice>>", "X": "<<end>>", None: "<<choice>>"}
+        for stop in self.caught_stops:
+            style = stop_styles.get(stop, "")
+            cnt = self.caught_stops[stop]
+            plantuml.append(f"""state "s{stop}" as s{stop} {style}: ×{cnt}""")
+        leg_styles = {"0": "down", "X": "down", None: ""}
+        for leg in self.caught_legs:
+            cnt = self.caught_legs[leg]
+            style = leg_styles.get(leg[0], "")
+            plantuml.append(f"s{leg[0]} -{style}-> s{leg[1]}: ×{cnt}")
+        plantuml.append("@enduml")
+        plantuml.append("")
+
+        log.info("########## ✂")
+        log.info("\n".join(plantuml))
+        log.info("########## ✂")
 
 
 class ServiceFactory:

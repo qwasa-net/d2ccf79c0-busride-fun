@@ -19,6 +19,8 @@ line-length = 120
 ignore = [
     "RUF100",
     "RUF012",
+    "RUF001",
+    "RUF002",
 ]
 select = [
     "ANN", # type annotations

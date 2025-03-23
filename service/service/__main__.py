@@ -74,6 +74,11 @@ def read_args() -> argparse.Namespace:
         action="store_true",
         default=bool(os.environ.get("DEBUG", "")),
     )
+    parser.add_argument(
+        "--draw-stats",
+        action="store_true",
+        default=bool(os.environ.get("DRAW_STATS", "")),
+    )
     args, _ = parser.parse_known_args()
 
     if args.bus_connection:

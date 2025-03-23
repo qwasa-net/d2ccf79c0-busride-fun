@@ -13,7 +13,9 @@ WORK_HARD_TIME=0.0025
 KICK_HARD_TIME=0
 KICK_START_DELAY=5
 START_DELAY=1
-DEBUG=
+
+DEBUG=${DEBUG:}
+DRAW_STATS=${DRAW_STATS:}
 
 #
 if [ "$BUS_TYPE" == "redis" ]; then
@@ -129,6 +131,7 @@ cat <<EOF
       BUS_TYPE: "${BUS_TYPE}"
       BUS_CONNECTION: "${BUS_CONNECTION}"
       DEBUG: ${DEBUG}
+      DRAW_STATS: ${DRAW_STATS}
     networks:
       - busride-network
 
