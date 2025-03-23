@@ -1,6 +1,45 @@
 [project]
-name = "buspub-service"
+name = "busride-service"
 version = "0.1.0"
-description = "A service for buspub"
+description = "a service for a fun bus ride"
 readme = "README.md"
 requires-python = ">=3.11"
+
+[tool.black]
+line-length = 110
+
+[tool.isort]
+profile = "black"
+line_length = 110
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = [
+    "RUF100",
+    "RUF012",
+]
+select = [
+    "ANN", # type annotations
+    "E", # pycodestyle (error)
+    "W", # pycodestyle (warning)
+    "N", # pep8-naming
+    "I", # isort
+    "A", # flake8-builtins
+    "LOG", # flake8-logging
+    "G", # flake8-logging-format
+    "Q", # flake8-quotes
+    "C4", # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "PIE", # flake8-pie
+    "PYI", # flake8-pyi
+    "RET", # flake8-return
+    "B", # bugbear
+    "F", # pyflakes
+    "UP", # pyupgrade
+    "RUF",
+#    "D",
+#    "DOC",
+]
+

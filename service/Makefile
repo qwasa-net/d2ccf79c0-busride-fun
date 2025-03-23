@@ -2,8 +2,12 @@ MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MAKEFILE_DIR := $(dir $(MAKEFILE_PATH))
 HOME_PATH := $(MAKEFILE_DIR)
 VENV_PATH ?= $(HOME_PATH)/_venv
+
 PYTHON ?= PYTHONPATH=$(HOME_PATH) $(VENV_PATH)/bin/python
 SYSTEM_PYTHON ?= python3
+
+DOCKER ?= DOCKER_BUILDKIT=1 DOCKER_PROGRESS=plain docker
+DOCKER_IMAGE ?= busride-service
 
 SRCFILES := service
 
@@ -21,8 +25,8 @@ lint:  ##
 	$(PYTHON) -m ruff check $(SRCFILES)
 
 run:  ##
-	$(PYTHON) service/service.py
+	$(PYTHON) -m service
 
 docker-build:  ##
-	true
+	$(DOCKER) build -f service.dockerfile -t $(DOCKER_IMAGE) $(HOME_PATH)
 
