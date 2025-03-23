@@ -1,0 +1,93 @@
+services:
+
+  redis:
+    image: redis
+    environment:
+      - REDIS_PORT=6379
+      - REDIS_HOST=0.0.0.0
+      - REDIS_DB=0
+    networks:
+      - busride-network
+
+  service-worker-1:
+    image: busride-service
+    hostname: busride-service-worker-1
+    depends_on:
+      - redis
+    environment:
+      SERVICE_ID: 1
+      SERVICES_LIST: "1 2 3 X"
+      SERVICE_TYPE: worker
+      WORK_HARD_TIME: 0.0025
+      BUS_TYPE: "redis"
+      BUS_CONNECTION: "{\"host\": \"redis\", \"port\": \"6379\", \"db\": \"0\"}"
+    networks:
+      - busride-network
+
+  service-worker-2:
+    image: busride-service
+    hostname: busride-service-worker-2
+    depends_on:
+      - redis
+    environment:
+      SERVICE_ID: 2
+      SERVICES_LIST: "1 2 3 X"
+      SERVICE_TYPE: worker
+      WORK_HARD_TIME: 0.0025
+      BUS_TYPE: "redis"
+      BUS_CONNECTION: "{\"host\": \"redis\", \"port\": \"6379\", \"db\": \"0\"}"
+    networks:
+      - busride-network
+
+  service-worker-3:
+    image: busride-service
+    hostname: busride-service-worker-3
+    depends_on:
+      - redis
+    environment:
+      SERVICE_ID: 3
+      SERVICES_LIST: "1 2 3 X"
+      SERVICE_TYPE: worker
+      WORK_HARD_TIME: 0.0025
+      BUS_TYPE: "redis"
+      BUS_CONNECTION: "{\"host\": \"redis\", \"port\": \"6379\", \"db\": \"0\"}"
+    networks:
+      - busride-network
+
+  service-x:
+    image: busride-service
+    hostname: busride-service-x
+    depends_on:
+      - redis
+    environment:
+      SERVICE_ID: X
+      SERVICE_TYPE: catcher
+      CATCH_COUNT: 100
+      EXIT: yes
+      BUS_TYPE: "redis"
+      BUS_CONNECTION: "{\"host\": \"redis\", \"port\": \"6379\", \"db\": \"0\"}"
+    networks:
+      - busride-network
+
+  service-0:
+    image: busride-service
+    hostname: busride-service-0
+    depends_on:
+      - redis
+    environment:
+      SERVICE_ID: 0
+      SERVICE_TYPE: kicker
+      SERVICES_LIST: "1 2 3"
+      KICK_COUNT: 100
+      WORK_HARD_TIME: 0
+      BUS_TYPE: "redis"
+      BUS_CONNECTION: "{\"host\": \"redis\", \"port\": \"6379\", \"db\": \"0\"}"
+    networks:
+      - busride-network
+
+networks:
+
+  busride-network:
+    driver: bridge
+
+# bye-bye
