@@ -31,20 +31,26 @@ class BusDriver(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def send(self, messages: list[BusMessage], *args: tuple, **kwargs: dict) -> None:
+    async def send(self, messages: list[BusMessage]) -> None:
         pass
 
     @abc.abstractmethod
-    def receive(self, *args: tuple, **kwargs: dict) -> list[BusMessage] | None:
+    async def receive(self, stream_name: str, *args: tuple, **kwargs: dict) -> list[BusMessage] | None:
         pass
+
+    async def start(self) -> None:
+        return
+
+    async def stop(self) -> None:
+        return
 
 
 class BusDriverFactory:
 
-    registry: dict[str, BusDriver] = {}
+    registry: dict[str, type[BusDriver]] = {}
 
     @classmethod
-    def register(cls, bus_type: str, driver_cls: BusDriver) -> None:
+    def register(cls, bus_type: str, driver_cls: type[BusDriver]) -> None:
         cls.registry[bus_type] = driver_cls
 
     @classmethod

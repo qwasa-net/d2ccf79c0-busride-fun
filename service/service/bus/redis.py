@@ -1,6 +1,6 @@
-import redis
+import redis.asyncio
 
-from ..helpers import try_ignore
+from ..helpers import async_try_ignore
 from ..logger import log
 from .bus import BusDriver, BusDriverFactory, BusMessage
 
@@ -22,31 +22,35 @@ class RedisBusDriver(BusDriver):
         *args: tuple,
         **kwargs: dict,
     ) -> None:
-        self.redis = redis.Redis(host=host, port=port, db=db)
+        self.redis = redis.asyncio.Redis(host=host, port=port, db=db)
 
-    @try_ignore(fb=None)
-    def send(self, messages: list[BusMessage]) -> None:
+    @async_try_ignore(fb=None)
+    async def send(self, messages: list[BusMessage]) -> None:
         for message in messages:
             log.debug("sending message: %s", message)
-            self.redis.xadd(
-                message.rcpt,
+            await self.redis.xadd(
+                str(message.rcpt),
                 message.data,
                 maxlen=self.STREAM_MAXLEN,
                 approximate=True,
             )
 
-    @try_ignore(fb=None)
-    def receive(
+    @async_try_ignore(fb=None)
+    async def receive(
         self,
         stream_name: str,
         count: int = 100,
         block: int = 1 * 1000,
+        *args: tuple,
+        **kwargs: dict,
     ) -> list[BusMessage] | None:
+        data = await self.redis.xread(
+            {stream_name: 0},
+            count=count,
+            block=block,
+        )
 
-        data = self.redis.xread({stream_name: 0}, count=count, block=block)
-
-        messages = []
-        ids_to_delete = []
+        messages, ids_to_delete = [], []
 
         for stream_data in data or []:
             for msg in stream_data[1]:
@@ -57,7 +61,7 @@ class RedisBusDriver(BusDriver):
                 ids_to_delete.append(msg_id)
 
         if ids_to_delete:
-            self.redis.xdel(stream_name, *ids_to_delete)
+            await self.redis.xdel(stream_name, *ids_to_delete)
 
         return messages
 

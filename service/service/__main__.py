@@ -1,8 +1,8 @@
 import argparse
+import asyncio
 import json
 import os
 import socket
-import time
 
 from . import service
 from .logger import configure_logging, log
@@ -101,10 +101,17 @@ def read_args() -> argparse.Namespace:
 def main() -> None:
     config = read_args()
     configure_logging(config)
-    log.info("Starting service with args: %s", config)
+    log.info(
+        "Starting service with args: %s",
+        "; ".join((f"{k}={v!s:.32s}" for k, v in config._get_kwargs())),
+    )
+    asyncio.run(forest_run(config))
+
+
+async def forest_run(config: argparse.Namespace) -> None:
+    await asyncio.sleep(config.start_delay)
     srv = service.ServiceFactory.create(config)
-    time.sleep(config.start_delay)
-    srv.run()
+    await srv.run()
 
 
 if __name__ == "__main__":

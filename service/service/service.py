@@ -4,7 +4,7 @@ from argparse import Namespace
 from collections import Counter
 
 from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, redis  # noqa
-from .helpers import rndstr, sleeq
+from .helpers import asleeq, rndstr
 from .logger import log
 
 
@@ -25,31 +25,33 @@ class Service:
             )
         return self._driver
 
-    def run(self) -> None:
+    async def run(self) -> None:
+        await self.driver.start()
         while True:
-            self.work()
+            await self.work()
+        await self.driver.stop()  # noqa
 
-    def work(self) -> None:
+    async def work(self) -> None:
         # read
         log.debug("reading for service_id=`%s` ...", self.id)
-        inbox = self.driver.receive(self.id)
+        inbox = await self.driver.receive(self.id)
         if not inbox:
             return
 
         # process
-        output = self.process(inbox)
+        output = await self.process(inbox)
 
         # write
-        self.driver.send(output)
+        await self.driver.send(output)
 
-    def process(self, messages: list[BusMessage]) -> list[BusMessage]:
+    async def process(self, messages: list[BusMessage]) -> list[BusMessage]:
         output = []
         for msg in messages or []:
             datas = msg.datas()
             log.debug("processing: id=%s log=%.80s", datas["id"], datas["log"])
 
             # hard work simulation
-            sleeq(self.config.work_hard_time)
+            await asleeq(self.config.work_hard_time)
             datas["log"] = str(datas.get("log") or "") + ";" + str(self.id)
             datas["counter"] = int(datas.get("counter", 0)) + 1
             datas["payload"] = rndstr(256)
@@ -71,8 +73,8 @@ class Service:
             return random.choice(self.services)
         return None
 
-    def idle(self, ts: float = 1.0) -> None:
-        sleeq(ts)
+    async def idle(self, ts: float = 1.0) -> None:
+        await asleeq(ts)
 
 
 class ServiceKicker(Service):
@@ -82,17 +84,19 @@ class ServiceKicker(Service):
         self.kick_count = config.kick_count
         self.work_hard_time = config.work_hard_time
 
-    def run(self) -> None:
-        self.kick()
+    async def run(self) -> None:
+        await self.driver.start()
+        await self.kick()
         log.info("kicker is done")
         while self.config.exit is False:
-            self.idle(999)
+            await self.idle(999)
         log.info("kicker exiting")
+        await self.driver.stop()
 
-    def kick(self) -> None:
+    async def kick(self) -> None:
         messages = []
         for i in range(1, int(self.kick_count) + 1):
-            sleeq(self.work_hard_time)
+            await asleeq(self.work_hard_time)
             message = BusMessage(
                 data={
                     "id": str(i),
@@ -106,7 +110,7 @@ class ServiceKicker(Service):
             )
             log.info("kicking the bus: #%s ·→[%s]", i, message.rcpt)
             messages.append(message)
-        self.driver.send(messages)
+        await self.driver.send(messages)
 
 
 class ServiceCatcher(Service):
@@ -119,9 +123,10 @@ class ServiceCatcher(Service):
         self.catch_count = config.catch_count
         super().__init__(config)
 
-    def run(self) -> None:
+    async def run(self) -> None:
+        await self.driver.start()
         while self.catch_count is None or len(self.caught_ids) < self.catch_count:
-            self.work()
+            await self.work()
 
         log.info("catcher finished, counter=%s", len(self.caught_ids))
         self.show_stats()
@@ -130,11 +135,12 @@ class ServiceCatcher(Service):
             self.draw_stats()
 
         while not self.config.exit:
-            self.idle(999)
+            await self.idle(999)
 
+        await self.driver.stop()
         log.info("catcher exiting")
 
-    def process(self, messages: list[BusMessage]) -> list[BusMessage]:
+    async def process(self, messages: list[BusMessage]) -> list[BusMessage]:
         for message in messages:
             message_data = message.datas()
             self.process_message(message_data)

@@ -1,8 +1,9 @@
 import json
 
-from confluent_kafka import Consumer, KafkaException, Producer
+import aiokafka
+import aiokafka.errors
 
-from ..helpers import try_ignore
+from ..helpers import async_try_ignore
 from ..logger import log
 from .bus import BusDriver, BusDriverFactory, BusMessage
 
@@ -15,6 +16,7 @@ class KafkaBusDriver(BusDriver):
     """
 
     TOPIC_PREFIX = "t."
+    AUTO_COMMIT_INTERVAL = 5000  # ms
 
     def __init__(
         self,
@@ -30,84 +32,97 @@ class KafkaBusDriver(BusDriver):
         self._subscribed_to = None
 
     @property
-    def producer(self) -> Producer:
+    def producer(self) -> aiokafka.AIOKafkaProducer:
         if not self._producer:
-            self._producer = Producer(
-                {
-                    "bootstrap.servers": self.bootstrap_servers,
-                    "client.id": "bus-driver",
-                    "linger.ms": 5,
-                    "acks": "0",
-                }
+            self._producer = aiokafka.AIOKafkaProducer(
+                bootstrap_servers=self.bootstrap_servers,
+                client_id="bus-driver",
+                linger_ms=10,
+                acks=0,
             )
         return self._producer
 
     @property
-    def consumer(self) -> Consumer:
+    def consumer(self) -> aiokafka.AIOKafkaConsumer:
         if not self._consumer:
-            self._consumer = Consumer(
-                {
-                    "bootstrap.servers": self.bootstrap_servers,
-                    "group.id": self.group_id,
-                    "client.id": "bus-driver",
-                    "auto.offset.reset": "earliest",
-                    "enable.partition.eof": False,
-                    "enable.auto.commit": False,
-                }
+            self._consumer = aiokafka.AIOKafkaConsumer(
+                bootstrap_servers=self.bootstrap_servers,
+                group_id=self.group_id,
+                client_id="bus-driver",
+                auto_offset_reset="earliest",
+                enable_auto_commit=self.AUTO_COMMIT_INTERVAL > 0,
+                auto_commit_interval_ms=self.AUTO_COMMIT_INTERVAL,
+                session_timeout_ms=90000,  # here goes some magic numbers
+                consumer_timeout_ms=100,
+                max_poll_records=1024,
+                retry_backoff_ms=1000,
             )
         return self._consumer
 
-    @try_ignore(fb=None)
-    def send(self, messages: list[BusMessage]) -> None:
+    async def start(self) -> None:
+        await self.producer.start()
+        await self.consumer.start()
+
+    async def stop(self) -> None:
+        await self.producer.stop()
+        await self.consumer.stop()
+
+    @async_try_ignore(fb=None)
+    async def send(self, messages: list[BusMessage]) -> None:
         for msg in messages:
             log.debug("sending message: %s", msg)
             topic = f"{self.TOPIC_PREFIX}{msg.rcpt}"
             try:
                 data = json.dumps(msg.data).encode("utf-8")
-                self.producer.produce(
+                rc = await self.producer.send_and_wait(
                     topic=topic,
                     value=data,
-                    key=msg.msg_id,
+                    key=str(msg.msg_id).encode("utf-8") if msg.msg_id else None,
                 )
-            except KafkaException as e:
+                log.debug("kafka produce result: %s", rc)
+            except aiokafka.errors.KafkaError as e:
                 log.error("kafka produce: %s", e)
-        self.producer.flush()
 
-    @try_ignore(fb=None)
-    def receive(
+    @async_try_ignore(fb=None)
+    async def receive(
         self,
         stream_name: str,
         count: int = 1024,
         timeout: float = 0.25,
+        *args: tuple,
+        **kwargs: dict,
     ) -> list[BusMessage] | None:
 
-        self.consumer_subscribe(stream_name)
+        await self.consumer_subscribe(stream_name)
 
         messages = []
-
+        topic_part = aiokafka.TopicPartition(f"{self.TOPIC_PREFIX}{stream_name}", 0)
         try:
-            msgs = self.consumer.consume(num_messages=count, timeout=timeout)
-            if not msgs:
-                return messages
-            for msg in msgs:
-                if msg is None:
-                    continue
-                if msg.error():
-                    log.error("kafka msg: %s", msg.error())
-                    continue
-                log.debug("msg: %s %s", msg.key(), msg.value())
-                data = json.loads(msg.value().decode("utf-8"))
-                bmsg = BusMessage(data=data, msg_id=msg.key())
-                messages.append(bmsg)
-                self.consumer.commit(msg)
-        except KafkaException as e:
+            result = await self.consumer.getmany(timeout_ms=int(timeout * 1000), max_records=count)
+            for topic_part, top_messages in result.items():
+                log.debug("got %s messages from `%s`", len(top_messages), topic_part)
+                for msg in top_messages:
+                    if msg is None:
+                        continue
+                    log.debug("msg: %s %s", msg.key, msg.value)
+                    data = json.loads(msg.value.decode("utf-8"))
+                    bmsg = BusMessage(data=data, msg_id=msg.key.decode("utf-8") if msg.key else None)
+                    messages.append(bmsg)
+                    if not self.AUTO_COMMIT_INTERVAL:
+                        await self.consumer.commit()
+                    if len(messages) >= count:
+                        break
+        except aiokafka.errors.KafkaError as e:
             log.error("kafka consume: %s", e)
+        except TimeoutError:
+            pass
 
         return messages
 
-    def consumer_subscribe(self, stream_name: str) -> None:
+    async def consumer_subscribe(self, stream_name: str) -> None:
         topic = f"{self.TOPIC_PREFIX}{stream_name}"
         if self._subscribed_to != topic:
+            log.info("subscribing to topic: %s", topic)
             self.consumer.subscribe([topic])
             self._subscribed_to = topic
 
