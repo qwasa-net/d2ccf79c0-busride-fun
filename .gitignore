@@ -11,4 +11,5 @@ cache__/
 .vscode/
 .settings/
 
-_kakas/
+/_*
+.*
