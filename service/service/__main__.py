@@ -58,8 +58,8 @@ def read_args() -> argparse.Namespace:
     parser.add_argument(
         "--bus-type",
         type=str,
-        default=os.environ.get("BUS_TYPE", "redis"),
-        choices=["redis", "kafka", "dummy"],
+        default=os.environ.get("BUS_TYPE", "dummy"),
+        choices=["redis", "kafka", "dummy", "pg_table"],
     )
     parser.add_argument(
         "--bus-connection",

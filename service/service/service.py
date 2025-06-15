@@ -3,7 +3,7 @@ import time
 from argparse import Namespace
 from collections import Counter
 
-from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, redis  # noqa
+from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, pg_table, redis  # noqa
 from .helpers import asleeq, rndstr
 from .logger import log
 

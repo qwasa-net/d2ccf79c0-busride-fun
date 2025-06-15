@@ -26,6 +26,10 @@ elif [ $BUS_TYPE == "kafka" ]; then
     BUS_SERVICE=kafka
     KICK_START_DELAY=15
     START_DELAY=19
+elif [ $BUS_TYPE == "pg_table" ]; then
+    BUS_CONNECTION=${BUS_CONNECTION:-'{\"user\": \"busride\", \"host\": \"psql\", \"db\": \"busride\", \"pswd\": \"pswd\"}'}
+    BUS_SERVICE=psql
+    START_DELAY=5
 else
     echo "unknown bus type: $BUS_TYPE"
     exit 1
@@ -45,6 +49,25 @@ if [ "$BUS_TYPE" == "redis" ]; then
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_HOST=${REDIS_HOST:-0.0.0.0}
       - REDIS_DB=${REDIS_DB:-0}
+    networks:
+      - busride-network
+
+EOF
+fi
+
+if [ "$BUS_TYPE" == "pg_table" ]; then
+    cat <<EOF
+
+  psql:
+    image: ${PSQL_IMAGE:-postgres:15}
+    environment:
+      - POSTGRES_USER=busride
+      - POSTGRES_PASSWORD=pswd
+      - POSTGRES_DB=busride
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
     networks:
       - busride-network
 
