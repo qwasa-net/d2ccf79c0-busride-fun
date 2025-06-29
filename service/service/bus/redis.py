@@ -12,7 +12,7 @@ class RedisBusDriver(BusDriver):
     This driver uses Redis to send and receive messages.
     """
 
-    STREAM_MAXLEN = 1000
+    STREAM_MAXLEN = 10240
 
     def __init__(
         self,
@@ -40,10 +40,11 @@ class RedisBusDriver(BusDriver):
         self,
         stream_name: str,
         count: int = 100,
-        block: int = 1 * 1000,
+        block: int = 500,
         *args: tuple,
         **kwargs: dict,
     ) -> list[BusMessage] | None:
+
         data = await self.redis.xread(
             {stream_name: 0},
             count=count,

@@ -26,6 +26,9 @@ elif [ $BUS_TYPE == "kafka" ]; then
     BUS_SERVICE=kafka
     KICK_START_DELAY=15
     START_DELAY=19
+elif [ $BUS_TYPE == "nats" ]; then
+    BUS_CONNECTION=${BUS_CONNECTION:-'{\"host\": \"nats\", \"port\": \"4222\"}'}
+    BUS_SERVICE=nats
 else
     echo "unknown bus type: $BUS_TYPE"
     exit 1
@@ -45,6 +48,17 @@ if [ "$BUS_TYPE" == "redis" ]; then
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_HOST=${REDIS_HOST:-0.0.0.0}
       - REDIS_DB=${REDIS_DB:-0}
+    networks:
+      - busride-network
+
+EOF
+fi
+
+if [ "$BUS_TYPE" == "nats" ]; then
+    cat <<EOF
+
+  nats:
+    image: ${REDIS_IMAGE:-nats:latest}
     networks:
       - busride-network
 

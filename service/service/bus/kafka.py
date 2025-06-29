@@ -88,7 +88,7 @@ class KafkaBusDriver(BusDriver):
         self,
         stream_name: str,
         count: int = 1024,
-        timeout: float = 0.25,
+        timeout: float = 0.05,
         *args: tuple,
         **kwargs: dict,
     ) -> list[BusMessage] | None:
