@@ -3,7 +3,7 @@ import time
 from argparse import Namespace
 from collections import Counter
 
-from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, pg_table, redis  # noqa
+from .bus import BusDriver, BusMessage, dummy, get_bus_driver, kafka, nats, pg_table, redis  # noqa
 from .helpers import asleeq, rndstr
 from .logger import log
 
@@ -180,8 +180,16 @@ class ServiceCatcher(Service):
     def show_stats(self) -> None:
         log.info("catcher stats:")
         log.info("  caught messages: %s", len(self.caught_ids))
-        log.info("  stops: %s", len(self.caught_stops))
-        log.info("  legs: %s", len(self.caught_legs))
+        log.info(
+            "  stops unique/total: %s/%s",
+            len(self.caught_stops),
+            sum(self.caught_stops.values()),
+        )
+        log.info(
+            "  legs unique/total: %s/%s",
+            len(self.caught_legs),
+            sum(self.caught_legs.values()),
+        )
         log.info(
             "  min travel time/legs: %.0d/%.0d",
             min([tt[0] for tt in self.travel_times]),

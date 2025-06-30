@@ -30,6 +30,9 @@ elif [ $BUS_TYPE == "pg_table" ]; then
     BUS_CONNECTION=${BUS_CONNECTION:-'{\"user\": \"busride\", \"host\": \"psql\", \"db\": \"busride\", \"pswd\": \"pswd\"}'}
     BUS_SERVICE=psql
     START_DELAY=5
+elif [ $BUS_TYPE == "nats" ]; then
+    BUS_CONNECTION=${BUS_CONNECTION:-'{\"host\": \"nats\", \"port\": \"4222\"}'}
+    BUS_SERVICE=nats
 else
     echo "unknown bus type: $BUS_TYPE"
     exit 1
@@ -68,6 +71,17 @@ if [ "$BUS_TYPE" == "pg_table" ]; then
       resources:
         limits:
           cpus: '0.50'
+    networks:
+      - busride-network
+
+EOF
+fi
+
+if [ "$BUS_TYPE" == "nats" ]; then
+    cat <<EOF
+
+  nats:
+    image: ${REDIS_IMAGE:-nats:latest}
     networks:
       - busride-network
 
